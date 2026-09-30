@@ -1,0 +1,60 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "CLI: ingest 招标文件",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "doc_analyze.cli",
+            "args": [
+                "ingest",
+                "定稿-中国电信股份有限公司长沙分公司2026-2027年维护工程项目设计服务采购项目.docx"
+            ],
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal",
+            "justMyCode": false
+        },
+        {
+            "name": "CLI: query (mock Agent)",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "doc_analyze.cli",
+            "args": [
+                "query",
+                "1",
+                "履约保证金的比例是多少"
+            ],
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal",
+            "justMyCode": false
+        },
+        {
+            "name": "FastAPI 服务 (uvicorn)",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "uvicorn",
+            "args": [
+                "doc_analyze.server:app",
+                "--host",
+                "127.0.0.1",
+                "--port",
+                "8765"
+            ],
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal",
+            "justMyCode": false
+        },
+        {
+            "name": "pytest 全量",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "pytest",
+            "args": [
+                "-q"
+            ],
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal",
+            "justMyCode": false
+        }
+    ]
+}

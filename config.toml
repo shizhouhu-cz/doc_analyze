@@ -1,0 +1,23 @@
+# doc-analyze 配置文件（优先级：环境变量 > 本文件 > 代码默认值）
+
+[app]
+db_path = "doc_analyze.db" # SQLite 路径；相对路径基于项目根
+max_agent_rounds = 6       # Agent 单次问答最大工具循环轮数
+max_chars = 4000           # get_chapter 单次返回正文上限（字符）
+top_k = 5                  # search_content 返回条数
+
+[llm]
+# provider = "mock"            # mock | openai
+
+# --- 方式一：ChatGPT / DashScope（Bearer 鉴权）---
+# provider = "openai"
+# api_key = "sk-..."
+# base_url = "https://dashscope.aliyuncs.com/compatible-mode/v1"  # ChatGPT 则整行删掉
+# recovery_model = "gpt-4o-mini"  # 或 qwen-plus
+
+# --- 方式二：内网 anvil 网关（裸 token 鉴权，实测可用）---
+provider = "openai"
+base_url = "http://192.168.111.101:10101/anvil-ai-platform-admin-gateway/aigateway/Qwen3.8-27B/v1"
+auth_header = "anvil_4f27daac7998476abed0550f8d38146f"
+recovery_model = "qwen"
+agent_model = "qwen"

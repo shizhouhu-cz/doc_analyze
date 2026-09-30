@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>doc-analyze 调试台</title>
+  <style>
+    :root {
+      --bg: #f5f6f8;
+      --surface: #ffffff;
+      --border: #e0e3e8;
+      --text: #1f2937;
+      --muted: #6b7280;
+      --brand: #0f766e;
+      --brand-soft: #ccfbf1;
+      --warn: #b45309;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: "Segoe UI", "Microsoft YaHei", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      font-size: 14px;
+    }
+
+    header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 10px 16px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    header h1 {
+      font-size: 16px;
+      margin: 0;
+      color: var(--brand);
+    }
+
+    .toolbar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    select,
+    input[type="text"],
+    input[type="file"] {
+      padding: 5px 8px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: var(--surface);
+    }
+
+    select {
+      max-width: 380px;
+    }
+
+    button {
+      padding: 5px 12px;
+      border: 1px solid var(--brand);
+      border-radius: 6px;
+      background: var(--brand);
+      color: #fff;
+      cursor: pointer;
+    }
+
+    button:hover {
+      opacity: 0.88;
+    }
+
+    button.ghost {
+      background: var(--surface);
+      color: var(--brand);
+    }
+
+    .stats {
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    main {
+      display: grid;
+      grid-template-columns: minmax(320px, 42%) 1fr;
+      gap: 12px;
+      padding: 12px 16px;
+    }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 12px;
+      margin-bottom: 12px;
+    }
+
+    .card h2 {
+      font-size: 13px;
+      margin: 0 0 8px;
+      color: var(--muted);
+      font-weight: 600;
+    }
+
+    .tree {
+      max-height: calc(100vh - 130px);
+      overflow: auto;
+    }
+
+    .node {
+      padding: 3px 8px;
+      border-radius: 4px;
+      cursor: pointer;
+      display: flex;
+      align-items: baseline;
+      gap: 6px;
+      white-space: nowrap;
+    }
+
+    .node:hover {
+      background: var(--brand-soft);
+    }
+
+    .node.active {
+      background: var(--brand);
+      color: #fff;
+    }
+
+    .node.active .chars {
+      color: #d1fae5;
+    }
+
+    .node .num {
+      color: var(--brand);
+      font-weight: 600;
+    }
+
+    .node.active .num {
+      color: #fff;
+    }
+
+    .node .nr {
+      color: var(--warn);
+      font-weight: 700;
+    }
+
+    .node.active .nr {
+      color: #fde68a;
+    }
+
+    .node .chars {
+      color: var(--muted);
+      font-size: 11px;
+      margin-left: auto;
+    }
+
+    .node.src-llm .title::after {
+      content: "〔llm〕";
+      color: var(--muted);
+      font-size: 11px;
+    }
+
+    .node.active .title::after {
+      color: #d1fae5;
+    }
+
+    pre {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 8px 10px;
+      max-height: 320px;
+      overflow: auto;
+      white-space: pre-wrap;
+      word-break: break-all;
+      margin: 6px 0 0;
+      font-size: 12px;
+      line-height: 1.6;
+    }
+
+    .chapter-path {
+      color: var(--muted);
+      font-size: 12px;
+      margin-top: 4px;
+    }
+
+    .qrow {
+      display: flex;
+      gap: 8px;
+    }
+
+    .qrow input {
+      flex: 1;
+    }
+
+    .step {
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--brand);
+      border-radius: 6px;
+      padding: 6px 8px;
+      margin-top: 8px;
+      background: var(--bg);
+    }
+
+    .step b {
+      color: var(--brand);
+      font-size: 12px;
+    }
+
+    .step .args {
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .empty {
+      color: var(--muted);
+      padding: 12px;
+      text-align: center;
+    }
+
+    #answer {
+      max-height: 420px;
+    }
+
+    .msg {
+      padding: 6px 10px;
+      border-radius: 6px;
+      margin-top: 8px;
+      font-size: 12px;
+    }
+
+    .msg.ok {
+      background: var(--brand-soft);
+      color: var(--brand);
+    }
+
+    .msg.err {
+      background: #fee2e2;
+      color: #b91c1c;
+    }
+  </style>
+</head>
+
+<body>
+  <header>
+    <h1>doc-analyze 调试台</h1>
+    <div class="toolbar">
+      <select id="docSelect" onchange="onSelectDoc()"></select>
+      <button class="ghost" onclick="refreshDocs()">刷新文档</button>
+      <input type="file" id="fileInput" accept=".docx">
+      <button onclick="uploadIngest(this)">上传解析</button>
+      <span id="stats" class="stats"></span>
+    </div>
+  </header>
+  <main>
+    <section class="card">
+      <h2>章节树（点击查看正文；* 为 needs_review）</h2>
+      <div id="tree" class="tree">
+        <div class="empty">请先选择或上传文档</div>
+      </div>
+    </section>
+    <section>
+      <div class="card">
+        <h2>章节正文</h2>
+        <div id="chapterInfo" class="chapter-path">未选择章节</div>
+        <pre id="chapterContent">—</pre>
+      </div>
+      <div class="card">
+        <h2>Agent 问答</h2>
+        <div class="qrow">
+          <input type="text" id="question" placeholder="例如：履约保证金的比例是多少" onkeydown="if(event.key==='Enter')ask()">
+          <button onclick="ask()">提问</button>
+        </div>
+        <div id="steps"></div>
+        <pre id="answer">—</pre>
+        <div id="queryMsg"></div>
+      </div>
+    </section>
+  </main>
+  <script>
+    "use strict";
+    const $ = (id) => document.getElementById(id);
+    let currentDocId = null;
+    let currentChapterId = null;
+
+    function msg(id, text, ok) {
+      const el = $(id);
+      el.innerHTML = "";
+      if (!text) return;
+      const div = document.createElement("div");
+      div.className = "msg " + (ok ? "ok" : "err");
+      div.textContent = text;
+      el.appendChild(div);
+    }
+
+    async function api(path, opts) {
+      const resp = await fetch(path, opts);
+      if (!resp.ok) {
+        let detail = resp.statusText;
+        try { detail = (await resp.json()).detail || detail; } catch (_) { }
+        throw new Error(detail);
+      }
+      return resp.json();
+    }
+
+    async function refreshDocs() {
+      const docs = await api("/api/documents");
+      const sel = $("docSelect");
+      sel.innerHTML = "";
+      if (!docs.length) {
+        const opt = document.createElement("option");
+        opt.textContent = "（暂无文档，请上传）";
+        sel.appendChild(opt);
+        $("stats").textContent = "";
+        $("tree").innerHTML = '<div class="empty">请先上传 DOCX 解析入库</div>';
+        return;
+      }
+      for (const d of docs) {
+        const opt = document.createElement("option");
+        opt.value = d.id;
+        opt.textContent = `#${d.id} ${d.doc_name}（${d.status}）`;
+        sel.appendChild(opt);
+      }
+      const wanted = currentDocId != null && docs.some((d) => d.id === currentDocId);
+      currentDocId = wanted ? currentDocId : docs[docs.length - 1].id;
+      sel.value = String(currentDocId);
+      await Promise.all([loadStats(), loadTree()]);
+    }
+
+    async function onSelectDoc() {
+      currentDocId = Number($("docSelect").value);
+      currentChapterId = null;
+      $("chapterInfo").textContent = "未选择章节";
+      $("chapterContent").textContent = "—";
+      await Promise.all([loadStats(), loadTree()]);
+    }
+
+    async function loadStats() {
+      if (currentDocId == null) { $("stats").textContent = ""; return; }
+      const s = await api(`/api/stats/${currentDocId}`);
+      $("stats").textContent =
+        `章节 ${s.chapters}（待复核 ${s.needs_review}）· 表格 ${s.tables} · 正文 ${s.total_chars} 字 · ${s.status}`;
+    }
+
+    async function loadTree() {
+      const tree = $("tree");
+      if (currentDocId == null) return;
+      let rows;
+      try { rows = await api(`/api/tree/${currentDocId}`); }
+      catch (e) { tree.innerHTML = `<div class="empty">${e.message}</div>`; return; }
+      tree.innerHTML = "";
+      for (const r of rows) {
+        const div = document.createElement("div");
+        div.className = "node src-" + (r.source || "rule");
+        div.style.marginLeft = ((r.level - 1) * 18) + "px";
+        div.dataset.id = r.id;
+        const num = document.createElement("span");
+        num.className = "num";
+        num.textContent = (r.number_prefix || "").trim();
+        const title = document.createElement("span");
+        title.className = "title";
+        title.textContent = r.title;
+        div.append(num, title);
+        if (r.needs_review) {
+          const nr = document.createElement("span");
+          nr.className = "nr"; nr.textContent = "*";
+          div.appendChild(nr);
+        }
+        const chars = document.createElement("span");
+        chars.className = "chars";
+        chars.textContent = `${r.content_chars}字 · #${r.id}`;
+        div.appendChild(chars);
+        div.onclick = () => loadChapter(r.id);
+        tree.appendChild(div);
+      }
+      if (currentChapterId != null) highlightChapter();
+    }
+
+    function highlightChapter() {
+      document.querySelectorAll("#tree .node").forEach((n) =>
+        n.classList.toggle("active", Number(n.dataset.id) === currentChapterId));
+    }
+
+    async function loadChapter(id) {
+      currentChapterId = id;
+      highlightChapter();
+      const c = await api(`/api/chapters/${id}`);
+      $("chapterInfo").textContent =
+        `#${c.id} · L${c.level} · ${c.chapter_path || c.title}`;
+      $("chapterContent").textContent = c.content || "（无正文）";
+    }
+
+    async function uploadIngest(btn) {
+      const input = $("fileInput");
+      msg("queryMsg", "");
+      if (!input.files.length) { alert("请先选择 .docx 文件"); return; }
+      const fd = new FormData();
+      fd.append("file", input.files[0]);
+      const oldText = btn ? btn.textContent : "";
+      if (btn) { btn.disabled = true; btn.textContent = "解析中…"; }
+      // 点击即清空章节树并进入 loading，避免展示陈旧树误导
+      currentChapterId = null;
+      $("chapterInfo").textContent = "未选择章节";
+      $("chapterContent").textContent = "—";
+      $("tree").innerHTML = '<div class="empty">正在解析文档，请稍候…</div>';
+      try {
+        const r = await api("/api/ingest", { method: "POST", body: fd });
+        currentDocId = r.doc_id;
+        msg("queryMsg",
+          `解析入库完成：doc_id=${r.doc_id}，章节 ${r.chapters}，表格 ${r.tables}，耗时 ${r.elapsed_seconds}s`, true);
+        input.value = "";
+        await refreshDocs();
+      } catch (e) {
+        msg("queryMsg", "解析失败：" + e.message, false);
+        await loadTree().catch(() => { });  // 失败恢复原章节树
+      } finally {
+        if (btn) { btn.disabled = false; btn.textContent = oldText; }
+      }
+    }
+
+    async function ask() {
+      const q = $("question").value.trim();
+      if (!q || currentDocId == null) { alert("请先选择文档并输入问题"); return; }
+      $("answer").textContent = "思考中…";
+      $("steps").innerHTML = "";
+      msg("queryMsg", "");
+      try {
+        const r = await api("/api/query", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ doc_id: currentDocId, question: q }),
+        });
+        for (const s of r.steps || []) {
+          const div = document.createElement("div");
+          div.className = "step";
+          const head = document.createElement("div");
+          const b = document.createElement("b");
+          b.textContent = "🔧 " + s.tool;
+          const args = document.createElement("span");
+          args.className = "args";
+          args.textContent = " " + JSON.stringify(s.args);
+          head.append(b, args);
+          const res = document.createElement("pre");
+          res.textContent = s.result || "（无返回）";
+          div.append(head, res);
+          $("steps").appendChild(div);
+        }
+        $("answer").textContent = r.answer || "（空回答）";
+      } catch (e) {
+        $("answer").textContent = "—";
+        msg("queryMsg", "查询失败：" + e.message, false);
+      }
+    }
+
+    refreshDocs();
+  </script>
+</body>
+
+</html>
